@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:18
+    container_name: nestjs-starter-template-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: nestjs-starter-template-db
+    ports:
+      - '5432:5432'
+    volumes:
+      - nestjs-starter-template-db-volume:/var/lib/postgresql/data
+
+  # s3:
+  #   image: rustfs/rustfs:latest
+  #   container_name: nestjs-starter-template-rustfs
+  #   restart: always
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   environment:
+  #     RUSTFS_ACCESS_KEY: admin
+  #     RUSTFS_SECRET_KEY: password
+  #   volumes:
+  #     - nestjs-starter-template-s3-volume:/data
+  #   command: /data
+
+volumes:
+  nestjs-starter-template-db-volume:
+  # nestjs-starter-template-s3-volume:
