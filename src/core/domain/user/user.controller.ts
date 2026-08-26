@@ -3,7 +3,6 @@ import {
   CreateUserCommand,
   CreateUserCommandPayloadDto,
 } from '@domain/user/command/create-user.command';
-// import { ApiKeyGuard } from '@infra/guards/api-key.guard';
 import { ApiKeyProtected } from '@shared/decorators/api-key-protected.decorator';
 import {
   FindUsersQuery,

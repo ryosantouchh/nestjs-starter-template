@@ -3,22 +3,26 @@ import type { ILogger } from '@infra/logger/logger';
 
 import { Inject } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { IsNotEmpty, IsString } from 'class-validator';
 
 import { ApiKey } from '@entities/api-key.entity';
+import { StringPack } from '@shared/packs';
 
 // ========== type ==========
 export class GenerateApiKeyCommandPayloadDto {
-  @IsString()
-  @IsNotEmpty()
+  @StringPack()
   platform: string;
 }
 
-export type GenerateApiKeyCommandResponse = {
+export class GenerateApiKeyCommandResponse {
+  @StringPack()
   id: string;
+
+  @StringPack()
   platform: string;
+
+  @StringPack()
   key: string;
-};
+}
 
 // ========== usecase ==========
 export class GenerateApiKeyCommand {

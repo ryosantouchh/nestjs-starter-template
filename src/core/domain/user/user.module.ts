@@ -11,6 +11,8 @@ import { FindUsersQuery } from './query/find-users.query';
   controllers: [UserController],
   providers: [
     { provide: 'IUserRepository', useClass: TypeOrmUserRepository },
+
+    // usecases
     CreateUserCommand,
     FindUsersQuery,
   ],

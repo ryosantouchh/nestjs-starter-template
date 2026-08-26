@@ -1,15 +1,13 @@
-import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { Module } from '@nestjs/common';
+import { AppLoggerModule } from '@infra/logger/logger.module';
 import { AppConfigModule } from '@shared/config/config.module';
 import { DatabaseModule } from '@infra/database/database.module';
-import { AppLoggerModule } from '@infra/logger/logger.module';
-import { GlobalExceptionFilter } from '@infra/filters/global-exception-filter';
-import { UserModule } from './user/user.module';
-import { ApiKeyModule } from './api-key/api-key.module';
-import { HealthModule } from '@infra/health/health.module';
 import { AppJwtModule } from '@infra/jwt/jwt.module';
-import { AuthModule } from './auth/auth.module';
 import { RabbitMQEventModule } from '@infra/rabbitmq/rabbitmq.module';
+import { NotificationModule } from './notification/notification.module';
+import { GlobalExceptionFilter } from '@infra/filters/global-exception-filter';
+import { HealthModule } from '@infra/health/health.module';
 
 @Module({
   imports: [
@@ -20,11 +18,9 @@ import { RabbitMQEventModule } from '@infra/rabbitmq/rabbitmq.module';
     RabbitMQEventModule,
     HealthModule,
 
-    // domain
-    ApiKeyModule,
-    UserModule,
-    AuthModule,
+    // worker domain
+    NotificationModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: GlobalExceptionFilter }],
 })
-export class AppModule {}
+export class WorkerModule {}

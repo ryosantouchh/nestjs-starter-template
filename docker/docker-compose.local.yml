@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     image: postgres:18
@@ -9,9 +8,55 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: nestjs-starter-template-db
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - nestjs-starter-template-db-volume:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: nestjs-starter-template-rabbitmq
+    ports:
+      - "5672:5672" # AMQP protocol
+      - "15672:15672" # management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - nestjs-starter-template-rabbitmq-volume:/var/lib/rabbitmq
+
+  # api:
+  #   build:
+  #     context: ..
+  #     dockerfile: ./docker/Dockerfile.api
+  #   image: nestjs-starter-api:latest
+  #   container_name: nestjs-starter-template-api
+  #   restart: always
+  #   env_file: ../.env
+  #   environment:
+  #     NODE_ENV: production
+  #     DATABASE_HOSTNAME: db
+  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - db
+  #     - rabbitmq
+
+  # worker:
+  #   build:
+  #     context: ..
+  #     dockerfile: ./docker/Dockerfile.worker
+  #   image: nestjs-starter-worker:latest
+  #   container_name: nestjs-starter-template-worker
+  #   restart: always
+  #   env_file: ../.env
+  #   environment:
+  #     NODE_ENV: production
+  #     DATABASE_HOSTNAME: db
+  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+  #   depends_on:
+  #     - db
+  #     - rabbitmq
 
   # s3:
   #   image: rustfs/rustfs:latest
@@ -29,4 +74,5 @@ services:
 
 volumes:
   nestjs-starter-template-db-volume:
+  nestjs-starter-template-rabbitmq-volume:
   # nestjs-starter-template-s3-volume:

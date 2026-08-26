@@ -53,6 +53,7 @@ export class CreateUserCommand {
     this.logger.info(`CreateUserCommand.execute finish save user to database`, {
       createdUser,
     });
+
     return this.mapResponse(createdUser);
   }
 }
