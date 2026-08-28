@@ -10,7 +10,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - nestjs-starter-template-db-volume:/var/lib/postgresql/data
+      - nestjs-starter-template-db-volume:/var/lib/postgresql
 
   rabbitmq:
     image: rabbitmq:4-management
