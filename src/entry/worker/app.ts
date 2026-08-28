@@ -5,7 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { WorkerModule } from '@domain/worker.module';
 import { ROUTING_KEYS } from '@infra/rabbitmq/routing-key';
 import { ILogger } from '@infra/logger/logger';
-import { setupQueueBindings } from '@infra/rabbitmq/queue-setup';
+import {
+  setupQueueBindings,
+  routingKeyToQueueName,
+} from '@infra/rabbitmq/queue-setup';
 
 async function bootstrap() {
   const app = await NestFactory.create(WorkerModule, { bufferLogs: true });
@@ -15,46 +18,45 @@ async function bootstrap() {
   const appLogger = app.get<ILogger>('ILogger');
 
   const exchange = configService.getOrThrow<string>('rabbitmq.exchange');
-  const queue = configService.getOrThrow<string>('rabbitmq.queue');
+  const exchangeType = configService.getOrThrow<
+    'direct' | 'topic' | 'fanout' | 'headers'
+  >('rabbitmq.exchangeType');
   const deadLetterExchange = configService.getOrThrow<string>(
     'rabbitmq.deadLetterExchange',
   );
-  const deadLetterQueue = configService.getOrThrow<string>(
-    'rabbitmq.deadLetterQueue',
-  );
+  const url = configService.getOrThrow<string>('rabbitmq.url');
 
   await setupQueueBindings({
-    url: configService.getOrThrow<string>('rabbitmq.url'),
+    url,
     exchange,
-    queue,
     routingKeys: ROUTING_KEYS,
     deadLetterExchange,
-    deadLetterQueue,
     logger: appLogger,
   });
+
   appLogger.info('Worker routing configuration', {
     exchange,
-    queue,
-    boundRoutingKeys: ROUTING_KEYS,
+    boundQueues: ROUTING_KEYS.map(routingKeyToQueueName),
   });
 
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: [configService.getOrThrow<string>('rabbitmq.url')],
-      exchange,
-      exchangeType: configService.getOrThrow<
-        'direct' | 'topic' | 'fanout' | 'headers'
-      >('rabbitmq.exchangeType'),
-      queue,
-      queueOptions: {
-        durable: true,
-        arguments: { 'x-dead-letter-exchange': deadLetterExchange },
+  for (const key of ROUTING_KEYS) {
+    app.connectMicroservice<MicroserviceOptions>({
+      transport: Transport.RMQ,
+      options: {
+        urls: [url],
+        exchange,
+        exchangeType,
+        queue: routingKeyToQueueName(key),
+        queueOptions: {
+          durable: true,
+          arguments: { 'x-dead-letter-exchange': deadLetterExchange },
+        },
+        noAck: false,
+        prefetch: 1,
       },
-      noAck: false,
-      prefetch: 1,
-    },
-  });
+    });
+  }
+
   app.enableShutdownHooks();
   await app.startAllMicroservices();
   await app.listen(process.env.WORKER_PORT ?? 3001);

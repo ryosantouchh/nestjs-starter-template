@@ -4,56 +4,43 @@ import type { ILogger } from '@infra/logger/logger';
 export async function setupQueueBindings(params: {
   url: string;
   exchange: string;
-  queue: string;
   routingKeys: readonly string[];
   deadLetterExchange: string;
-  deadLetterQueue: string;
   logger: ILogger;
 }) {
-  const {
-    url,
-    exchange,
-    queue,
-    routingKeys,
-    deadLetterExchange,
-    deadLetterQueue,
-    logger,
-  } = params;
+  const { url, exchange, routingKeys, deadLetterExchange, logger } = params;
 
   const connection = await amqp.connect(url);
   const channel = await connection.createChannel();
 
   await channel.assertExchange(deadLetterExchange, 'fanout', { durable: true });
-  await channel.assertQueue(deadLetterQueue, { durable: true });
-  await channel.bindQueue(deadLetterQueue, deadLetterExchange, '');
-  logger.info('Dead-letter queue ready', {
-    deadLetterQueue,
-    deadLetterExchange,
-  });
-
   await channel.assertExchange(exchange, 'direct', { durable: true });
-  await channel.assertQueue(queue, {
-    durable: true,
-    arguments: { 'x-dead-letter-exchange': deadLetterExchange },
-  });
 
   for (const key of routingKeys) {
-    await channel.bindQueue(queue, exchange, key);
-    logger.info('Queue bound to routing key', {
-      queue,
+    const queueName = routingKeyToQueueName(key);
+    const dlqName = `${queueName}.dlq`;
+
+    await channel.assertQueue(dlqName, { durable: true });
+    await channel.bindQueue(dlqName, deadLetterExchange, '');
+
+    await channel.assertQueue(queueName, {
+      durable: true,
+      arguments: { 'x-dead-letter-exchange': deadLetterExchange },
+    });
+    await channel.bindQueue(queueName, exchange, key);
+
+    logger.info('Queue bound', {
+      queueName,
       exchange,
       routingKey: key,
+      dlqName,
     });
   }
 
-  logger.info('Queue bindings ready', {
-    exchange,
-    queue,
-    routingKeys,
-    deadLetterExchange,
-    deadLetterQueue,
-  });
-
   await channel.close();
   await connection.close();
+}
+
+export function routingKeyToQueueName(key: string): string {
+  return key.replace(/\./g, '_').replace(/-/g, '_') + '_queue';
 }
