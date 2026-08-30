@@ -28,5 +28,5 @@ export class PaginationMetadata {
 
 export class PaginatedResponse {
   @ObjectPack(PaginationMetadata)
-  metadata: PaginationMetadata;
+  pagination: PaginationMetadata;
 }

@@ -34,21 +34,13 @@ export class FindUsersQuery {
   }
 
   async execute(): Promise<FindUsersQueryResponse> {
-    const users = await this.userRepository.findAll();
+    const { data: users, pagination } = await this.userRepository.findAll();
 
     const data = this.mapResponse(users);
 
     return {
       data,
-      metadata: {
-        totalCount: 1,
-        totalItems: 1,
-        page: 1,
-        limit: 1,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPreviousPage: false,
-      },
+      pagination,
     };
   }
 }
