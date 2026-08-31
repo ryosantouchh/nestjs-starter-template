@@ -24,6 +24,18 @@ services:
     volumes:
       - nestjs-starter-template-rabbitmq-volume:/var/lib/rabbitmq
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: nestjs-starter-template-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - tempo
+
   tempo:
     image: grafana/tempo:latest
     container_name: nestjs-starter-template-tempo
@@ -32,8 +44,6 @@ services:
       - ./tempo.yaml:/etc/tempo.yaml
     ports:
       - "3200:3200" # query port for grafana
-      - "4317:4317"
-      - "4318:4318"
 
   grafana:
     image: grafana/grafana:latest
