@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import type { IUserRepository } from '@infra/repositories/user.repository';
 import type { ILogger } from '@infra/logger/logger';
 import { JwtPayload } from '@shared/types';
@@ -27,6 +28,8 @@ export class SignInDto {
   password: string;
 }
 
+const tracer = trace.getTracer('sign-in-command');
+
 @Injectable()
 export class SignInCommand {
   constructor(
@@ -46,10 +49,23 @@ export class SignInCommand {
 
     const jwtPayload: JwtPayload = { sub: user.username || 'test' };
 
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(jwtPayload, { expiresIn: '1h' }),
-      this.jwtService.signAsync(jwtPayload, { expiresIn: '7d' }),
-    ]);
+    const { accessToken, refreshToken } = await tracer.startActiveSpan(
+      'sign-in-jwt',
+      async (span) => {
+        try {
+          const [accessToken, refreshToken] = await Promise.all([
+            this.jwtService.signAsync(jwtPayload, { expiresIn: '1h' }),
+            this.jwtService.signAsync(jwtPayload, { expiresIn: '7d' }),
+          ]);
+
+          span.setStatus({ code: SpanStatusCode.OK });
+
+          return { accessToken, refreshToken };
+        } finally {
+          span.end();
+        }
+      },
+    );
 
     this.logger.info('User signed in', { userId: user.id });
 

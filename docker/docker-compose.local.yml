@@ -24,6 +24,29 @@ services:
     volumes:
       - nestjs-starter-template-rabbitmq-volume:/var/lib/rabbitmq
 
+  tempo:
+    image: grafana/tempo:latest
+    container_name: nestjs-starter-template-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200" # query port for grafana
+      - "4317:4317"
+      - "4318:4318"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nestjs-starter-template-grafana
+    ports:
+      - "3900:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password
+    volumes:
+      - ./grafana-datasource.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - nestjs-starter-template-grafana-volume:/var/lib/grafana
+
   # api:
   #   build:
   #     context: ..
@@ -75,4 +98,5 @@ services:
 volumes:
   nestjs-starter-template-db-volume:
   nestjs-starter-template-rabbitmq-volume:
+  nestjs-starter-template-grafana-volume:
   # nestjs-starter-template-s3-volume:

@@ -1,3 +1,5 @@
+import '@infra/tracing/instrumentation';
+
 import { AppModule } from '@domain/app.module';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
