@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
             return existingId;
           }
           const id = randomUUID();
+          req.headers['x-request-id'] = id;
           res.setHeader('x-request-id', id);
           return id;
         },
