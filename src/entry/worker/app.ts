@@ -52,7 +52,7 @@ async function bootstrap() {
           arguments: { 'x-dead-letter-exchange': deadLetterExchange },
         },
         noAck: false,
-        prefetch: 1,
+        prefetchCount: 1,
       },
     });
   }

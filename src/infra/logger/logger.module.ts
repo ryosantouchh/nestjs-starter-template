@@ -8,14 +8,20 @@ import { randomUUID } from 'crypto';
   imports: [
     LoggerModule.forRoot({
       pinoHttp: {
-        genReqId: (req, res) => {
-          const existingId = req.headers['x-request-id'];
-          if (existingId) {
-            return existingId;
+        genReqId: (req, _res) => {
+          const requestId = req.headers['x-request-id'] ?? randomUUID();
+          req.headers['x-request-id'] = requestId;
+
+          const clientActionId = req.headers['x-client-action-id'];
+
+          if (clientActionId) {
+            req.headers['x-client-action-id'] = clientActionId;
           }
-          const id = randomUUID();
-          res.setHeader('x-request-id', id);
-          return id;
+
+          return {
+            requestId,
+            clientActionId: clientActionId ?? undefined,
+          };
         },
         level: process.env.LOG_LEVEL || 'info',
         autoLogging: false,
