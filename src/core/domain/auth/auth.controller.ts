@@ -6,7 +6,7 @@ import {
 } from './command/sign-in.command';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { SignUpCommand, SignUpDto } from './command/sign-up.command';
-import { TraceRoute } from '@shared/decorators';
+import { TraceRoute } from '@infra/decorators';
 
 @Controller({ path: 'v1/auth' })
 export class AuthController {

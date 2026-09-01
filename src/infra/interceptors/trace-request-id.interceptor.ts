@@ -9,7 +9,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { trace, context } from '@opentelemetry/api';
 import { Observable } from 'rxjs';
-import { TRACE_REQUEST_ID_KEY } from '@shared/decorators';
+import { TRACE_REQUEST_ID_KEY } from '@infra/decorators';
 
 @Injectable()
 export class TraceRequestIdInterceptor implements NestInterceptor {

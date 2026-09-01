@@ -3,13 +3,12 @@ import {
   CreateUserCommand,
   CreateUserCommandPayloadDto,
 } from '@domain/user/command/create-user.command';
-import { ApiKeyProtected } from '@shared/decorators/api-key-protected.decorator';
 import {
   FindUsersQuery,
   FindUsersQueryResponse,
 } from './query/find-users.query';
 import { ApiOkResponse } from '@nestjs/swagger';
-import { JwtProtected } from '@shared/decorators';
+import { JwtProtected, ApiKeyProtected } from '@infra/decorators';
 
 @Controller({ path: 'v1/users' })
 export class UserController {

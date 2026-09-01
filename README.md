@@ -41,9 +41,11 @@ Layering:
 src/
 ├── core/       domain — entities, modules, use cases (commands/queries/tasks)
 ├── infra/      adapters — db, repositories, rabbitmq, logger, tracing, guards, filters
-├── shared/     cross-cutting — config, errors, decorators, DTO "packs", utils
+├── shared/     dependency-free — config, errors, DTO "packs", utils, types
 └── entry/      composition roots — api | worker | repl
 ```
+
+Dependencies flow one direction only: **`entry → core → infra → shared`**. `shared/` imports nothing from the rest of the codebase — if a module needs one of your own runtime classes, it belongs in `infra/`, not `shared/`.
 
 Domain code depends on **interfaces** (`IUserRepository`, `ILogger`, `INotificationService`), bound to concrete infra classes via string tokens in each module's `providers`. Swapping TypeORM for something else means touching `infra/repositories` only.
 
@@ -90,16 +92,16 @@ src/
 │   ├── repositories/                # TypeORM implementations
 │   ├── rabbitmq/                    # publisher, queue setup, routing keys, helpers
 │   ├── tracing/instrumentation.ts   # OTel NodeSDK bootstrap
-│   ├── interceptors/                # trace-request-id interceptor
-│   ├── guards/                      # ApiKeyGuard, JwtAuthGuard
+│   ├── interceptors/                # TraceRequestIdInterceptor + @TraceRoute
+│   ├── guards/                      # ApiKeyGuard, JwtAuthGuard + their decorators
 │   ├── filters/                     # GlobalExceptionFilter
 │   ├── logger/                      # pino wrapper behind ILogger
 │   └── health/                      # terminus /health
 ├── shared/
 │   ├── config/                      # app config, swagger config
-│   ├── decorators/                  # JwtProtected, ApiKeyProtected, TraceRoute
 │   ├── packs/                       # composed validation + Swagger decorators
 │   ├── errors/                      # BaseError + typed 4xx/5xx exceptions
+│   ├── types/                       # jwt, pagination
 │   └── utils/                       # getEnv, pagination
 └── entry/                           # api | worker | repl
 ```
@@ -251,6 +253,8 @@ async signIn(@Body() body: SignInDto) { ... }
 
 `TraceRoute` composes `SetMetadata('trace_request_id', true)` with `TraceRequestIdInterceptor`, which reads the header and sets `http.request_id` on the current span. In Grafana you can then search Tempo by `http.request_id` and pivot from a log line to its trace.
 
+The decorator, the metadata key, and the interceptor that reads it all live in `src/infra/interceptors/` — the key can't drift from its only consumer.
+
 ### Finding traces in Grafana
 
 1. Open http://localhost:3900 (`admin` / `password`). The Tempo datasource is provisioned automatically from `docker/grafana-datasource.yaml`.
@@ -318,9 +322,11 @@ this.eventPublisher.publish(RoutingKeysEnum.NOTIFICATION_SEND_EMAIL, {
 
 ## Auth
 
-Two independent mechanisms, both applied as composed decorators that also register the correct Swagger security scheme:
+Two independent mechanisms, both applied as composed decorators that also register the correct Swagger security scheme. Each decorator sits beside the guard it binds, in `src/infra/guards/`:
 
 ```ts
+import { ApiKeyProtected, JwtProtected } from '@infra/guards';
+
 @ApiKeyProtected()   // x-api-key header → ApiKeyGuard → DB lookup + timingSafeEqual
 @JwtProtected()      // Authorization: Bearer <jwt> → JwtAuthGuard → verify, attach req.user
 ```
@@ -369,6 +375,17 @@ Available: `StringPack`, `NumberPack`, `BooleanPack`, `DatePack`, `EnumPack`, `A
 **Errors.** Everything extends `BaseError` (status, message, optional code, optional context). `GlobalExceptionFilter` serializes known errors via `toJSON()` and collapses anything unknown into a 500 without leaking internals.
 
 **Path aliases.** `@domain/*`, `@entities/*`, `@infra/*`, `@shared/*`. Resolved by `tsconfig-paths` in dev and rewritten by `tsc-alias` at build.
+
+**Where a decorator belongs.** If it names one of your own runtime classes — a guard, an interceptor, a metadata key someone else reads — it goes in `infra/`, next to that class. If it only composes third-party decorators, like the `packs`, it goes in `shared/`. This is why `@ApiKeyProtected` lives in `infra/guards/` while `@StringPack` lives in `shared/packs/`.
+
+Two greps enforce the boundary:
+
+```bash
+grep -rn "@infra" src/shared/      # must be empty
+grep -rn "@domain" src/infra/      # must be empty
+```
+
+**Barrels export outward only.** Inside a folder, siblings import each other by relative path (`./api-key.guard`), never through the folder's own `index.ts`. The barrel version compiles fine and then resolves to `undefined` at decorator-evaluation time, before Nest bootstraps and before the logger exists.
 
 ---
 
@@ -425,6 +442,7 @@ Honest list of what this branch does **not** do yet.
 
 ### Application
 
+- **`GlobalExceptionFilter` assumes an HTTP context but is registered in `WorkerModule` too.** It calls `host.switchToHttp().getResponse()` unconditionally; under RMQ that returns the `RmqContext`, and `.status()` is not a function — so the filter throws a `TypeError` that replaces the real error. `NotificationConsumer`'s own try/catch hides this today, but anything thrown outside it (deserialization, `ValidationPipe` on the task DTO) hits the filter. Guard with `host.getType() !== 'http'` and rethrow.
 - **`SignInCommand` never verifies the password**, and `SignUpCommand` stores it in plaintext. Placeholder auth — do not ship.
 - `.env.example` is missing `PORT`, `WORKER_PORT`, `LOG_LEVEL`, `CORS_ORIGIN`, and both `OTEL_*` variables, and still lists the dead `RABBITMQ_WORKER_QUEUE` / `RABBITMQ_DLQ`.
 - `rabbitmq.queue` and `rabbitmq.deadLetterQueue` in `app.config.ts` have no readers — queue and DLQ names are derived.
