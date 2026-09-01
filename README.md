@@ -16,6 +16,7 @@ This branch (`tracing-collector`) adds the observability stack on top of the API
 - [Running the app](#running-the-app)
 - [Observability](#observability)
 - [Messaging](#messaging)
+- [Use cases: commands, queries, tasks](#use-cases-commands-queries-tasks)
 - [Auth](#auth)
 - [Database & migrations](#database--migrations)
 - [Conventions](#conventions)
@@ -320,6 +321,81 @@ this.eventPublisher.publish(RoutingKeysEnum.NOTIFICATION_SEND_EMAIL, {
 
 ---
 
+## Use cases: commands, queries, tasks
+
+There are no `UserUsecase` or `AuthUsecase` classes here, and that's deliberate. Every operation is its own class with a single `execute()` method, filed by what it does:
+
+| Kind | Folder | Mutates? | Triggered by | Example |
+|---|---|---|---|---|
+| **Command** | `command/` | yes | HTTP controller | `CreateUserCommand`, `SignInCommand` |
+| **Query** | `query/` | no | HTTP controller | `FindUsersQuery` |
+| **Task** | `tasks/` | yes | RabbitMQ consumer | `SendEmailTask` |
+
+```
+src/core/domain/user/
+├── command/create-user.command.ts
+├── query/find-users.query.ts
+├── user.controller.ts
+└── user.module.ts
+
+src/core/domain/notification/
+├── tasks/send-email.task.ts
+├── notification.consumer.ts
+└── notification.module.ts
+```
+
+Commands and queries split the same way, but tasks are a separate kind rather than "commands triggered by a message." They run in a different process, under manual ack, and can be redelivered — so they have to be idempotent in a way an HTTP command doesn't. Keeping them in their own folder makes that requirement visible at the file path.
+
+### Rules
+
+**One class, one `execute()`.** If you need a second entry point, you need a second class.
+
+**DTOs live in the same file as the use case that owns them.** `create-user.command.ts` exports `CreateUserCommandPayloadDto`, `CreateUserCommandResponse`, and `CreateUserCommand` together. Nothing has to be kept in sync across files, and deleting the use case deletes its contract:
+
+```ts
+// ========== type ==========
+export class CreateUserCommandPayloadDto { /* ... */ }
+export type CreateUserCommandResponse = { /* ... */ };
+
+// ========== usecase ==========
+export class CreateUserCommand {
+  private mapResponse(user: User): CreateUserCommandResponse { /* ... */ }
+  async execute(payload: CreateUserCommandPayloadDto): Promise<CreateUserCommandResponse> { /* ... */ }
+}
+```
+
+**Entities never cross the boundary.** Each use case has a private `mapResponse()` that converts persistence objects into its own response type, so a new column on `User` can't silently appear in an API payload.
+
+**Use cases don't call each other.** They compose repositories, services, and `EventPublisher`. If two need the same logic, that logic belongs in a service under `infra/service/`.
+
+**Registration is explicit** in the owning module, grouped under a comment:
+
+```ts
+providers: [
+  { provide: 'IUserRepository', useClass: TypeOrmUserRepository },
+
+  // usecases
+  CreateUserCommand,
+  FindUsersQuery,
+],
+```
+
+### Why not one service class
+
+A `UserUsecase` accumulates every operation on `User`, and its constructor accumulates every dependency any of those operations needs. Sign-in ends up carrying the S3 client because one unrelated method uploads an avatar. Here `SignInCommand` injects exactly four things and a reader can see all of them at once.
+
+It also makes tracing natural. `SignInCommand` opens its own `sign-in-jwt` span with a tracer named for the class — one span per unit of business work, because the class boundary already is that unit.
+
+The cost is file count: 40 endpoints means 40 files. That's the trade, and it's the right one past a certain size.
+
+### This is not full CQRS
+
+Command/query separation here is a naming and file-layout convention, nothing more. There is **no** command bus, no `@nestjs/cqrs`, no separate read and write models, no event sourcing, and no eventual consistency between them — commands and queries hit the same Postgres tables through the same TypeORM repositories. Controllers call use cases directly by injection.
+
+The RabbitMQ events are integration events for async side effects (send an email), not domain events driving a projection. If you want real CQRS, this layout gives you the seam to grow into it, but don't mistake it for the thing itself.
+
+---
+
 ## Auth
 
 Two independent mechanisms, both applied as composed decorators that also register the correct Swagger security scheme. Each decorator sits beside the guard it binds, in `src/infra/guards/`:
@@ -356,7 +432,7 @@ The TypeORM CLI datasource lives at `src/infra/database/datasource.ts` and reads
 
 ## Conventions
 
-**Use cases, not services.** One class, one `execute()`. Commands mutate, queries read: `CreateUserCommand`, `FindUsersQuery`, `SignInCommand`. They're registered under a `// usecases` comment block in each module.
+**Use cases, not services.** One class, one `execute()`, filed as command, query, or task — see [Use cases](#use-cases-commands-queries-tasks).
 
 **Packs.** `src/shared/packs/` composes `class-validator` and `@nestjs/swagger` decorators into a single decorator per type, so a DTO field declares validation and OpenAPI schema at once:
 
