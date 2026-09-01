@@ -16,6 +16,7 @@ import { ROUTING_KEYS } from '@infra/rabbitmq/routing-key';
           transport: Transport.RMQ,
           options: {
             urls: [configService.getOrThrow<string>('rabbitmq.url')],
+            persistent: true,
             exchange: configService.getOrThrow<string>('rabbitmq.exchange'),
             exchangeType: configService.getOrThrow<
               'direct' | 'topic' | 'fanout' | 'headers'
