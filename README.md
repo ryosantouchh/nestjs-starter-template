@@ -2,8 +2,6 @@
 
 A production-shaped NestJS starter: layered architecture, TypeORM + Postgres, RabbitMQ worker with dead-letter queues, JWT + API-key auth, structured logging, and **end-to-end distributed tracing via OpenTelemetry → OTel Collector → Tempo → Grafana**.
 
-This branch (`tracing-collector`) adds the observability stack on top of the API/worker foundation.
-
 ---
 
 ## Table of contents
