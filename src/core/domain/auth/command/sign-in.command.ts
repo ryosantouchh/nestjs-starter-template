@@ -6,6 +6,9 @@ import type { ILogger } from '@infra/logger/logger';
 import { JwtPayload } from '@shared/types';
 import { NotFoundException } from '@shared/errors';
 import { ObjectPack, StringPack } from '@shared/packs';
+import { EventPublisher } from '@infra/rabbitmq/event-publisher.service';
+import { RoutingKeysEnum } from '@infra/rabbitmq/routing-key';
+import { EmailTemplateEnum } from '@shared/constants';
 
 export class SignInCredentialsDto {
   @StringPack()
@@ -34,6 +37,7 @@ const tracer = trace.getTracer('sign-in-command');
 export class SignInCommand {
   constructor(
     @Inject('ILogger') private readonly logger: ILogger,
+    private readonly eventPublisher: EventPublisher,
     @Inject('IUserRepository') private readonly userRepository: IUserRepository,
     @Inject(JwtService) private readonly jwtService: JwtService,
   ) {}
@@ -53,6 +57,10 @@ export class SignInCommand {
       'sign-in-jwt',
       async (span) => {
         try {
+          span.setAttributes({
+            user_id: user.id,
+            user_name: user.name ?? '',
+          });
           const [accessToken, refreshToken] = await Promise.all([
             this.jwtService.signAsync(jwtPayload, { expiresIn: '1h' }),
             this.jwtService.signAsync(jwtPayload, { expiresIn: '7d' }),
@@ -68,6 +76,12 @@ export class SignInCommand {
     );
 
     this.logger.info('User signed in', { userId: user.id });
+
+    this.eventPublisher.publish(RoutingKeysEnum.NOTIFICATION_SEND_EMAIL, {
+      email: 'example@mail.com',
+      template: EmailTemplateEnum.WELCOME,
+      data: { name: 'test' },
+    });
 
     return { credentials: { accessToken, refreshToken } };
   }

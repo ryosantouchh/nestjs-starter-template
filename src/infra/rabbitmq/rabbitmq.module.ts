@@ -2,13 +2,15 @@ import { Global, Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 import { EventPublisher } from './event-publisher.service';
+import { routingKeyToQueueName } from '@infra/rabbitmq/queue-setup';
+import { ROUTING_KEYS } from '@infra/rabbitmq/routing-key';
 
 @Global()
 @Module({
   imports: [
-    ClientsModule.registerAsync([
-      {
-        name: 'RABBITMQ_EVENT_CLIENT',
+    ClientsModule.registerAsync(
+      ROUTING_KEYS.map((key) => ({
+        name: `RABBITMQ_CLIENT_${key}`,
         inject: [ConfigService],
         useFactory: (configService: ConfigService) => ({
           transport: Transport.RMQ,
@@ -18,7 +20,7 @@ import { EventPublisher } from './event-publisher.service';
             exchangeType: configService.getOrThrow<
               'direct' | 'topic' | 'fanout' | 'headers'
             >('rabbitmq.exchangeType'),
-            queue: configService.getOrThrow<string>('rabbitmq.queue'),
+            queue: routingKeyToQueueName(key),
             queueOptions: {
               durable: true,
               arguments: {
@@ -29,8 +31,8 @@ import { EventPublisher } from './event-publisher.service';
             },
           },
         }),
-      },
-    ]),
+      })),
+    ),
   ],
   providers: [EventPublisher],
   exports: [ClientsModule, EventPublisher],
